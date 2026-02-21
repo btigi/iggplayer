@@ -1,0 +1,206 @@
+@page "/"
+@implements IDisposable
+@using IggPlayer.Data
+@using IggPlayer.Services
+@inject MusicService MusicService
+@inject PlayLogService PlayLogService
+@inject LibraryScanService ScanService
+@rendermode InteractiveServer
+
+<PageTitle>IggPlayer</PageTitle>
+
+<div class="app-container">
+    <header class="app-header">
+        <h1 class="app-title">IggPlayer</h1>
+        <div class="header-actions">
+            <span class="track-count">@_trackCount tracks</span>
+            <button class="btn btn-scan" @onclick="ScanLibrary" disabled="@_scanning">
+                @if (_scanning)
+                {
+                    <span class="spinner"></span>
+                    <span>Scanning...</span>
+                }
+                else
+                {
+                    <span>Scan Library</span>
+                }
+            </button>
+        </div>
+    </header>
+
+    <div class="search-section">
+        <div class="search-box">
+            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+            </svg>
+            <input type="text"
+                   class="search-input"
+                   placeholder="Search by title, artist, album, or filename..."
+                   @bind="_searchQuery"
+                   @bind:event="oninput"
+                   @bind:after="OnSearchChanged" />
+            @if (!string.IsNullOrEmpty(_searchQuery))
+            {
+                <button class="search-clear" @onclick="ClearSearch">&times;</button>
+            }
+        </div>
+    </div>
+
+    @if (_scanResult is not null)
+    {
+        <div class="scan-result">
+            Scan complete: @_scanResult.Value.added added, @_scanResult.Value.skipped unchanged, @_scanResult.Value.failed failed.
+            <button class="dismiss-btn" @onclick="() => _scanResult = null">&times;</button>
+        </div>
+    }
+
+    <div class="results-section">
+        @if (_tracks is null)
+        {
+            <div class="loading">Loading...</div>
+        }
+        else if (_tracks.Count == 0)
+        {
+            <div class="empty-state">
+                @if (string.IsNullOrEmpty(_searchQuery))
+                {
+                    <p>No tracks in the library yet.</p>
+                    <p>Click <strong>Scan Library</strong> to index your MP3 files.</p>
+                }
+                else
+                {
+                    <p>No tracks match "<strong>@_searchQuery</strong>"</p>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="track-list">
+                @foreach (var track in _tracks)
+                {
+                    var isActive = _currentTrack?.Id == track.Id;
+                    <button class="track-item @(isActive ? "active" : "")" @onclick="() => PlayTrack(track)">
+                        <div class="track-play-icon">
+                            @if (isActive)
+                            {
+                                <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                            }
+                            else
+                            {
+                                <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+                            }
+                        </div>
+                        <div class="track-info">
+                            <span class="track-title">@(track.Title ?? track.FileName)</span>
+                            <span class="track-meta">
+                                @if (!string.IsNullOrEmpty(track.Artist))
+                                {
+                                    <span>@track.Artist</span>
+                                }
+                                @if (!string.IsNullOrEmpty(track.Album))
+                                {
+                                    <span class="separator">·</span>
+                                    <span>@track.Album</span>
+                                }
+                            </span>
+                        </div>
+                        <span class="track-duration">@FormatDuration(track.Duration)</span>
+                    </button>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@if (_currentTrack is not null)
+{
+    <div class="player-bar">
+        <div class="player-track-info">
+            <span class="player-title">@(_currentTrack.Title ?? _currentTrack.FileName)</span>
+            <span class="player-artist">@_currentTrack.Artist</span>
+        </div>
+        <audio @key="_currentTrack.Id"
+               src="/api/stream/@_currentTrack.Id"
+               autoplay
+               controls
+               preload="auto"
+               class="player-audio">
+        </audio>
+    </div>
+}
+
+@code {
+    private string _searchQuery = "";
+    private List<Track>? _tracks;
+    private Track? _currentTrack;
+    private bool _scanning;
+    private (int added, int skipped, int failed)? _scanResult;
+    private int _trackCount;
+    private CancellationTokenSource? _debounceCts;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _tracks = await MusicService.SearchAsync("");
+        _trackCount = await MusicService.GetTrackCountAsync();
+    }
+
+    private async Task OnSearchChanged()
+    {
+        _debounceCts?.Cancel();
+        _debounceCts = new CancellationTokenSource();
+        var token = _debounceCts.Token;
+
+        try
+        {
+            await Task.Delay(300, token);
+            _tracks = await MusicService.SearchAsync(_searchQuery);
+            StateHasChanged();
+        }
+        catch (TaskCanceledException) { }
+    }
+
+    private async Task ClearSearch()
+    {
+        _searchQuery = "";
+        _tracks = await MusicService.SearchAsync("");
+    }
+
+    private async Task PlayTrack(Track track)
+    {
+        _currentTrack = track;
+        await PlayLogService.LogPlayAsync(track);
+    }
+
+    private async Task ScanLibrary()
+    {
+        _scanning = true;
+        StateHasChanged();
+
+        try
+        {
+            _scanResult = await ScanService.ScanAsync();
+            _tracks = await MusicService.SearchAsync(_searchQuery);
+            _trackCount = await MusicService.GetTrackCountAsync();
+        }
+        catch (Exception)
+        {
+            _scanResult = (0, 0, -1);
+        }
+        finally
+        {
+            _scanning = false;
+        }
+    }
+
+    private static string FormatDuration(TimeSpan ts)
+    {
+        return ts.TotalHours >= 1
+            ? ts.ToString(@"h\:mm\:ss")
+            : ts.ToString(@"m\:ss");
+    }
+
+    public void Dispose()
+    {
+        _debounceCts?.Dispose();
+    }
+}
