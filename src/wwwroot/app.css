@@ -39,8 +39,10 @@ html, body {
 
 /* === Navigation === */
 .app-nav {
-    position: sticky;
+    position: fixed;
     top: 0;
+    left: 0;
+    right: 0;
     z-index: 900;
     display: flex;
     align-items: center;
@@ -50,6 +52,11 @@ html, body {
     background: rgba(15, 17, 21, 0.92);
     backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--border);
+}
+
+/* === Main Content === */
+.main-content {
+    padding-top: var(--nav-height);
 }
 
 .nav-brand {
@@ -100,11 +107,6 @@ html, body {
     color: #fff;
     font-size: 0.72rem;
     font-weight: 600;
-}
-
-/* === Main Content === */
-.main-content {
-    min-height: calc(100vh - var(--nav-height));
 }
 
 /* === App Container === */
