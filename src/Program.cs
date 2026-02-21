@@ -19,6 +19,7 @@ builder.Services.AddSingleton<FileStreamService>();
 builder.Services.AddScoped<MusicService>();
 builder.Services.AddScoped<PlayLogService>();
 builder.Services.AddScoped<LibraryScanService>();
+builder.Services.AddScoped<PlaylistService>();
 
 var app = builder.Build();
 
@@ -36,7 +37,8 @@ static void EnsureDatabaseCurrent<T>(IServiceScope scope) where T : DbContext
         db.Database.EnsureCreated();
         foreach (var entityType in db.Model.GetEntityTypes())
         {
-            db.Database.ExecuteSqlRaw($"SELECT * FROM \"{entityType.GetTableName()}\" LIMIT 0");
+            var tableName = entityType.GetTableName();
+            db.Database.ExecuteSqlRaw(string.Concat("SELECT * FROM \"", tableName, "\" LIMIT 0"));
         }
     }
     catch

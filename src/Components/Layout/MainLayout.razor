@@ -1,11 +1,157 @@
 @inherits LayoutComponentBase
+@implements IDisposable
+@using IggPlayer.Data
+@using IggPlayer.Services
+@inject PlaylistService Playlist
+@inject PlayLogService PlayLog
+@inject IJSRuntime JS
+@inject NavigationManager Nav
 
-<main>
+<nav class="app-nav">
+    <a href="/" class="nav-brand">IggPlayer</a>
+    <div class="nav-links">
+        <a href="/" class="nav-link @(IsActive("/") ? "active" : "")">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+            </svg>
+            Search
+        </a>
+        <a href="/playlist" class="nav-link @(IsActive("/playlist") ? "active" : "")">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>
+            </svg>
+            Playlist
+            @if (Playlist.Queue.Count > 0)
+            {
+                <span class="nav-badge">@Playlist.Queue.Count</span>
+            }
+        </a>
+    </div>
+</nav>
+
+<main class="main-content">
     @Body
 </main>
+
+@if (Playlist.CurrentTrack is not null)
+{
+    <div class="player-bar">
+        <button class="player-btn" @onclick="PreviousTrack" disabled="@(Playlist.CurrentIndex <= 0)" title="Previous">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg>
+        </button>
+        <div class="player-track-info">
+            <span class="player-title">@(Playlist.CurrentTrack.Title ?? Playlist.CurrentTrack.FileName)</span>
+            <span class="player-artist">@Playlist.CurrentTrack.Artist</span>
+        </div>
+        <audio id="mainAudioPlayer"
+               controls
+               preload="auto"
+               class="player-audio">
+        </audio>
+        <button class="player-btn" @onclick="NextTrack" disabled="@(Playlist.CurrentIndex >= Playlist.Queue.Count - 1)" title="Next">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+        </button>
+    </div>
+}
 
 <div id="blazor-error-ui" data-nosnippet>
     An unhandled error has occurred.
     <a href="." class="reload">Reload</a>
     <span class="dismiss">&#x1f5d9;</span>
 </div>
+
+@code {
+    private IJSObjectReference? _audioModule;
+    private DotNetObjectReference<MainLayout>? _dotNetRef;
+    private int? _lastPlayedTrackId;
+
+    protected override void OnInitialized()
+    {
+        Playlist.OnChanged += OnPlaylistChanged;
+        Nav.LocationChanged += OnLocationChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _dotNetRef = DotNetObjectReference.Create(this);
+            _audioModule = await JS.InvokeAsync<IJSObjectReference>("import", "./js/audio-interop.js");
+            await _audioModule.InvokeVoidAsync("init", _dotNetRef);
+        }
+
+        if (Playlist.CurrentTrack is not null && _lastPlayedTrackId != Playlist.CurrentTrack.Id)
+        {
+            _lastPlayedTrackId = Playlist.CurrentTrack.Id;
+            if (_audioModule is not null)
+            {
+                await _audioModule.InvokeVoidAsync("bindAudio", "mainAudioPlayer");
+                await _audioModule.InvokeVoidAsync("play", $"/api/stream/{Playlist.CurrentTrack.Id}");
+            }
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnTrackEnded()
+    {
+        var next = Playlist.Next();
+        if (next is not null)
+        {
+            await PlayLog.LogPlayAsync(next);
+            StateHasChanged();
+        }
+    }
+
+    private async Task NextTrack()
+    {
+        var next = Playlist.Next();
+        if (next is not null)
+            await PlayLog.LogPlayAsync(next);
+    }
+
+    private async Task PreviousTrack()
+    {
+        var prev = Playlist.Previous();
+        if (prev is not null)
+            await PlayLog.LogPlayAsync(prev);
+    }
+
+    private void OnPlaylistChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    private bool IsActive(string path)
+    {
+        var uri = Nav.ToBaseRelativePath(Nav.Uri);
+        if (path == "/") return string.IsNullOrEmpty(uri);
+        return uri.StartsWith(path.TrimStart('/'), StringComparison.OrdinalIgnoreCase);
+    }
+
+    public void Dispose()
+    {
+        Playlist.OnChanged -= OnPlaylistChanged;
+        Nav.LocationChanged -= OnLocationChanged;
+        _dotNetRef?.Dispose();
+        // Module disposal is fire-and-forget since Dispose is sync
+        _ = DisposeModuleAsync();
+    }
+
+    private async Task DisposeModuleAsync()
+    {
+        if (_audioModule is not null)
+        {
+            try
+            {
+                await _audioModule.InvokeVoidAsync("dispose");
+                await _audioModule.DisposeAsync();
+            }
+            catch { }
+        }
+    }
+}
