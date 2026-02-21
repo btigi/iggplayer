@@ -7,6 +7,8 @@
 @inject IJSRuntime JS
 @inject NavigationManager Nav
 
+<PageTitle>@(_pageTitle)</PageTitle>
+
 <nav class="app-nav">
     <a href="/" class="nav-brand">IggPlayer</a>
     <div class="nav-links">
@@ -64,6 +66,10 @@
     private IJSObjectReference? _audioModule;
     private DotNetObjectReference<MainLayout>? _dotNetRef;
     private int? _lastPlayedTrackId;
+
+    private string _pageTitle => Playlist.CurrentTrack is not null
+        ? $"[IP] {Playlist.CurrentTrack.DisplayName}"
+        : "[IP] IggPlayer";
 
     protected override void OnInitialized()
     {
