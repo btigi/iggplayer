@@ -5,7 +5,8 @@
     padding: 0;
 }
 
-:root {
+:root,
+html[data-theme="dark"] {
     --bg-primary: #0f1115;
     --bg-secondary: #1a1d24;
     --bg-tertiary: #242830;
@@ -26,6 +27,44 @@
     --player-height: 80px;
     --nav-height: 56px;
     --font-mono: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+html[data-theme="light"] {
+    --bg-primary: #f5f5f7;
+    --bg-secondary: #ffffff;
+    --bg-tertiary: #e8e8ed;
+    --bg-hover: #e0e0e5;
+    --bg-active: #cce0ff;
+    --text-primary: #1d1d1f;
+    --text-secondary: #6e6e73;
+    --text-muted: #86868b;
+    --accent: #0071e3;
+    --accent-hover: #0077ed;
+    --accent-glow: rgba(0, 113, 227, 0.12);
+    --danger: #d93025;
+    --danger-hover: #ea4335;
+    --border: #d2d2d7;
+}
+
+html[data-theme="light"] .app-nav {
+    background: rgba(245, 245, 247, 0.92);
+}
+
+html[data-theme="light"] .player-bar {
+    background: rgba(255, 255, 255, 0.95);
+}
+
+html[data-theme="light"] .player-btn {
+    color: #1d1d1f;
+}
+
+html[data-theme="light"] .player-btn:hover:not(:disabled) {
+    background: rgba(0, 0, 0, 0.08);
+    color: #1d1d1f;
+}
+
+html[data-theme="light"] .player-audio {
+    filter: none;
 }
 
 html, body {
@@ -70,6 +109,35 @@ html, body {
 .nav-links {
     display: flex;
     gap: 4px;
+}
+
+.nav-right {
+    margin-left: auto;
+}
+
+.theme-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all var(--transition);
+}
+
+.theme-toggle:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.theme-toggle svg {
+    width: 20px;
+    height: 20px;
 }
 
 .nav-link {
@@ -478,14 +546,14 @@ html, body {
     border: none;
     border-radius: 50%;
     background: transparent;
-    color: var(--text-secondary);
+    color: #fff;
     cursor: pointer;
     transition: all var(--transition);
 }
 
 .player-btn:hover:not(:disabled) {
-    background: var(--bg-tertiary);
-    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.15);
+    color: #fff;
 }
 
 .player-btn:disabled {
@@ -529,10 +597,7 @@ html, body {
     max-width: 550px;
     border-radius: 20px;
     outline: none;
-}
-
-audio::-webkit-media-controls-panel {
-    background: var(--bg-tertiary);
+    filter: invert(1);
 }
 
 /* === Blazor Error UI === */

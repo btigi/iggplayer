@@ -29,6 +29,22 @@
             }
         </a>
     </div>
+    <div class="nav-right">
+        <button class="theme-toggle" @onclick="ToggleTheme" title="@(_theme == "dark" ? "Switch to light mode" : "Switch to dark mode")">
+            @if (_theme == "dark")
+            {
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                    <circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+                </svg>
+            }
+            else
+            {
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                </svg>
+            }
+        </button>
+    </div>
 </nav>
 
 <main class="main-content">
@@ -64,8 +80,10 @@
 
 @code {
     private IJSObjectReference? _audioModule;
+    private IJSObjectReference? _themeModule;
     private DotNetObjectReference<MainLayout>? _dotNetRef;
     private int? _lastPlayedTrackId;
+    private string _theme = "dark";
 
     private string _pageTitle => Playlist.CurrentTrack is not null
         ? $"[IP] {Playlist.CurrentTrack.DisplayName}"
@@ -84,6 +102,10 @@
             _dotNetRef = DotNetObjectReference.Create(this);
             _audioModule = await JS.InvokeAsync<IJSObjectReference>("import", "./js/audio-interop.js");
             await _audioModule.InvokeVoidAsync("init", _dotNetRef);
+
+            _themeModule = await JS.InvokeAsync<IJSObjectReference>("import", "./js/theme.js");
+            _theme = await _themeModule.InvokeAsync<string>("getTheme");
+            StateHasChanged();
         }
 
         if (Playlist.CurrentTrack is not null && _lastPlayedTrackId != Playlist.CurrentTrack.Id)
@@ -132,6 +154,14 @@
         InvokeAsync(StateHasChanged);
     }
 
+    private async Task ToggleTheme()
+    {
+        if (_themeModule is null) return;
+        var next = _theme == "dark" ? "light" : "dark";
+        await _themeModule.InvokeVoidAsync("setTheme", next);
+        _theme = next;
+    }
+
     private bool IsActive(string path)
     {
         var uri = Nav.ToBaseRelativePath(Nav.Uri);
@@ -150,14 +180,16 @@
 
     private async Task DisposeModuleAsync()
     {
-        if (_audioModule is not null)
+        try
         {
-            try
+            if (_audioModule is not null)
             {
                 await _audioModule.InvokeVoidAsync("dispose");
                 await _audioModule.DisposeAsync();
             }
-            catch { }
+            if (_themeModule is not null)
+                await _themeModule.DisposeAsync();
         }
+        catch { }
     }
 }

@@ -23,12 +23,9 @@ public class PlaylistService
 
     public void PlayNow(Track track)
     {
-        var insertIndex = _currentIndex + 1;
-        if (_queue.Count == 0)
-            insertIndex = 0;
-
-        _queue.Insert(insertIndex, track);
-        _currentIndex = insertIndex;
+        _queue.Clear();
+        _queue.Add(track);
+        _currentIndex = 0;
         NotifyChanged();
     }
 
