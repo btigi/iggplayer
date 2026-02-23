@@ -13,7 +13,11 @@ public class PlayLogDbContext : DbContext
         modelBuilder.Entity<PlayLogEntry>(e =>
         {
             e.ToTable("play_history");
-            e.Property(p => p.Id).HasColumnName("id");
+            e.HasKey(p => p.Id);
+            e.Property(p => p.Id)
+                .HasColumnName("id")
+                .HasConversion<string>()
+                .ValueGeneratedNever();
             e.Property(p => p.PlayedAt).HasColumnName("played_at").IsRequired();
             e.Property(p => p.FilePath).HasColumnName("filepath");
             e.Property(p => p.FileName).HasColumnName("filename");

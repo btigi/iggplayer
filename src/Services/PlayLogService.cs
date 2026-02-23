@@ -26,6 +26,7 @@ public class PlayLogService
         await using var db = await _dbFactory.CreateDbContextAsync();
         db.PlayHistory.Add(new PlayLogEntry
         {
+            Id = Guid.NewGuid(),
             PlayedAt = DateTime.UtcNow.ToString("o"),
             FilePath = resolvedPath,
             FileName = track.FileName,

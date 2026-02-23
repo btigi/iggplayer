@@ -6,7 +6,7 @@ namespace IggPlayer.Data;
 public class PlayLogEntry
 {
     [Column("id")]
-    public int Id { get; set; }
+    public Guid Id { get; set; }
 
     [Column("played_at")]
     public required string PlayedAt { get; set; }
