@@ -41,4 +41,30 @@ public class MusicService
         await using var db = await _dbFactory.CreateDbContextAsync();
         return await db.Tracks.CountAsync();
     }
+
+    public async Task<List<Track>> GetTracksByArtistAsync(string artist, int maxResults = 500)
+    {
+        if (string.IsNullOrWhiteSpace(artist))
+            return [];
+        await using var db = await _dbFactory.CreateDbContextAsync();
+        var pattern = $"%{artist}%";
+        return await db.Tracks
+            .Where(t => EF.Functions.Like(t.Artist!, pattern))
+            .OrderBy(t => t.Album).ThenBy(t => t.TrackNumber).ThenBy(t => t.Title)
+            .Take(maxResults)
+            .ToListAsync();
+    }
+
+    public async Task<List<Track>> GetTracksByAlbumAsync(string album, int maxResults = 500)
+    {
+        if (string.IsNullOrWhiteSpace(album))
+            return [];
+        await using var db = await _dbFactory.CreateDbContextAsync();
+        var pattern = $"%{album}%";
+        return await db.Tracks
+            .Where(t => EF.Functions.Like(t.Album!, pattern))
+            .OrderBy(t => t.TrackNumber).ThenBy(t => t.Title)
+            .Take(maxResults)
+            .ToListAsync();
+    }
 }

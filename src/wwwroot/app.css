@@ -425,11 +425,58 @@ html, body {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 2px;
 }
 
 .track-meta .separator {
-    margin: 0 6px;
+    margin: 0 4px;
     color: var(--text-muted);
+}
+
+.track-meta .meta-link {
+    padding: 0;
+    border: none;
+    background: none;
+    font: inherit;
+    color: var(--accent);
+    cursor: pointer;
+    text-decoration: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 180px;
+}
+
+.track-meta .meta-link:hover {
+    text-decoration: underline;
+    color: var(--accent-hover);
+}
+
+.track-meta .meta-add {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    font-weight: 600;
+    line-height: 1;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition);
+}
+
+.track-meta .meta-add:hover {
+    background: var(--accent-glow);
+    color: var(--accent);
 }
 
 .track-duration {

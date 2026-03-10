@@ -97,12 +97,14 @@
                             <span class="track-meta">
                                 @if (!string.IsNullOrEmpty(track.Artist))
                                 {
-                                    <span>@track.Artist</span>
+                                    <button type="button" class="meta-link" @onclick="() => SetSearchAndRun(track.Artist!)" title="Search for this artist">@track.Artist</button>
+                                    <button type="button" class="meta-add" @onclick="() => AddArtistToPlaylist(track.Artist!)" title="Add all by this artist to playlist">+</button>
                                 }
                                 @if (!string.IsNullOrEmpty(track.Album))
                                 {
                                     <span class="separator">·</span>
-                                    <span>@track.Album</span>
+                                    <button type="button" class="meta-link" @onclick="() => SetSearchAndRun(track.Album!)" title="Search for this album">@track.Album</button>
+                                    <button type="button" class="meta-add" @onclick="() => AddAlbumToPlaylist(track.Album!)" title="Add entire album to playlist">+</button>
                                 }
                             </span>
                         </div>
@@ -164,6 +166,26 @@
     private void AddToPlaylist(Track track)
     {
         Playlist.Enqueue(track);
+    }
+
+    private async Task SetSearchAndRun(string query)
+    {
+        _searchQuery = query;
+        _tracks = await MusicService.SearchAsync(query);
+    }
+
+    private async Task AddArtistToPlaylist(string artist)
+    {
+        var tracks = await MusicService.GetTracksByArtistAsync(artist);
+        foreach (var t in tracks)
+            Playlist.Enqueue(t);
+    }
+
+    private async Task AddAlbumToPlaylist(string album)
+    {
+        var tracks = await MusicService.GetTracksByAlbumAsync(album);
+        foreach (var t in tracks)
+            Playlist.Enqueue(t);
     }
 
     private async Task ScanLibrary()
