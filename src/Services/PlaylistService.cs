@@ -90,5 +90,14 @@ public class PlaylistService
         NotifyChanged();
     }
 
+    public void RestoreFromTracks(IReadOnlyList<Track> tracks, int currentIndex)
+    {
+        _queue.Clear();
+        foreach (var t in tracks)
+            _queue.Add(t);
+        _currentIndex = currentIndex >= 0 && currentIndex < _queue.Count ? currentIndex : (_queue.Count > 0 ? 0 : -1);
+        NotifyChanged();
+    }
+
     private void NotifyChanged() => OnChanged?.Invoke();
 }

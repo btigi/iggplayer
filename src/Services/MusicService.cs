@@ -36,6 +36,15 @@ public class MusicService
         return await db.Tracks.FindAsync(id);
     }
 
+    public async Task<List<Track>> GetTracksByIdsAsync(IReadOnlyList<int> ids)
+    {
+        if (ids.Count == 0) return [];
+        await using var db = await _dbFactory.CreateDbContextAsync();
+        var idSet = ids.Distinct().ToList();
+        var tracks = await db.Tracks.Where(t => idSet.Contains(t.Id)).ToListAsync();
+        return ids.Select(id => tracks.FirstOrDefault(t => t.Id == id)).Where(t => t is not null).Cast<Track>().ToList();
+    }
+
     public async Task<int> GetTrackCountAsync()
     {
         await using var db = await _dbFactory.CreateDbContextAsync();

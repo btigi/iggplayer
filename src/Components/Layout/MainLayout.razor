@@ -4,6 +4,7 @@
 @using IggPlayer.Services
 @inject PlaylistService Playlist
 @inject PlayLogService PlayLog
+@inject MusicService MusicService
 @inject IJSRuntime JS
 @inject NavigationManager Nav
 
@@ -81,6 +82,7 @@
 @code {
     private IJSObjectReference? _audioModule;
     private IJSObjectReference? _themeModule;
+    private IJSObjectReference? _persistenceModule;
     private DotNetObjectReference<MainLayout>? _dotNetRef;
     private int? _lastPlayedTrackId;
     private string _theme = "dark";
@@ -105,6 +107,19 @@
 
             _themeModule = await JS.InvokeAsync<IJSObjectReference>("import", "./js/theme.js");
             _theme = await _themeModule.InvokeAsync<string>("getTheme");
+
+            _persistenceModule = await JS.InvokeAsync<IJSObjectReference>("import", "./js/persistence.js");
+            var playlistState = await _persistenceModule.InvokeAsync<PlaylistState?>("getPlaylistState");
+            if (playlistState?.TrackIds is { Count: > 0 })
+            {
+                var tracks = await MusicService.GetTracksByIdsAsync(playlistState.TrackIds);
+                if (tracks.Count > 0)
+                {
+                    var idx = playlistState.CurrentIndex;
+                    if (idx < 0 || idx >= tracks.Count) idx = 0;
+                    Playlist.RestoreFromTracks(tracks, idx);
+                }
+            }
             StateHasChanged();
         }
 
@@ -144,9 +159,23 @@
             await PlayLog.LogPlayAsync(prev);
     }
 
-    private void OnPlaylistChanged()
+    private async void OnPlaylistChanged()
     {
-        InvokeAsync(StateHasChanged);
+        await SavePlaylistStateAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task SavePlaylistStateAsync()
+    {
+        if (_persistenceModule is null) return;
+        var list = Playlist.Queue.ToList();
+        if (list.Count == 0)
+        {
+            await _persistenceModule.InvokeVoidAsync("setPlaylistState", (object?)null);
+            return;
+        }
+        var state = new PlaylistState(list.Select(t => t.Id).ToList(), Playlist.CurrentIndex);
+        await _persistenceModule.InvokeVoidAsync("setPlaylistState", state);
     }
 
     private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
@@ -189,7 +218,11 @@
             }
             if (_themeModule is not null)
                 await _themeModule.DisposeAsync();
+            if (_persistenceModule is not null)
+                await _persistenceModule.DisposeAsync();
         }
         catch { }
     }
+
+    private record PlaylistState(List<int> TrackIds, int CurrentIndex);
 }
