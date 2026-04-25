@@ -109,6 +109,7 @@ html, body {
 .nav-links {
     display: flex;
     gap: 4px;
+    overflow-x: auto;
 }
 
 .nav-right {
@@ -484,6 +485,74 @@ html, body {
     font-size: 0.82rem;
     color: var(--text-muted);
     font-variant-numeric: tabular-nums;
+}
+
+/* === Library List Pages === */
+.library-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 8px;
+}
+
+.library-list-item {
+    width: 100%;
+    min-width: 0;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-secondary);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: background var(--transition), border-color var(--transition);
+}
+
+.library-list-item:hover {
+    background: var(--bg-hover);
+    border-color: var(--accent);
+}
+
+.library-list-title {
+    display: block;
+    flex: 1;
+    min-width: 0;
+    color: var(--text-primary);
+    font-size: 0.92rem;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.library-list-actions {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.library-action-btn {
+    width: 30px;
+    height: 30px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all var(--transition);
+}
+
+.library-action-btn:hover {
+    background: var(--accent-glow);
+    color: var(--accent);
+}
+
+.library-action-btn svg {
+    width: 16px;
+    height: 16px;
 }
 
 /* Playlist index number */

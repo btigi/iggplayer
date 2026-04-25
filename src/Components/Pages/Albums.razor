@@ -1,0 +1,153 @@
+@page "/albums"
+@implements IDisposable
+@using IggPlayer.Services
+@inject MusicService MusicService
+@inject PlaylistService Playlist
+@inject PlayLogService PlayLogService
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+@rendermode InteractiveServer
+
+<div class="app-container">
+    <header class="app-header">
+        <h1 class="page-heading">Albums</h1>
+        <div class="header-actions">
+            @if (_albums is not null)
+            {
+                <span class="track-count">@_albums.Count albums</span>
+            }
+        </div>
+    </header>
+
+    <div class="search-section">
+        <div class="search-box">
+            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+            </svg>
+            <input type="text"
+                   class="search-input"
+                   placeholder="Search albums..."
+                   @bind="_searchQuery"
+                   @bind:event="oninput"
+                   @bind:after="OnSearchChanged" />
+            @if (!string.IsNullOrEmpty(_searchQuery))
+            {
+                <button class="search-clear" @onclick="ClearSearch">&times;</button>
+            }
+        </div>
+    </div>
+
+    @if (_albums is null)
+    {
+        <div class="loading">Loading...</div>
+    }
+    else if (_albums.Count == 0)
+    {
+        <div class="empty-state">
+            @if (string.IsNullOrEmpty(_searchQuery))
+            {
+                <p>No albums found.</p>
+            }
+            else
+            {
+                <p>No albums match "<strong>@_searchQuery</strong>"</p>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="library-list">
+            @foreach (var album in _albums)
+            {
+                <div class="library-list-item">
+                    <span class="library-list-title">@album</span>
+                    <div class="library-list-actions">
+                        <button type="button" class="library-action-btn" @onclick="() => SearchForAlbum(album)" title="Search for this album">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                            </svg>
+                        </button>
+                        <button type="button" class="library-action-btn" @onclick="() => AddAlbumToPlaylist(album)" title="Add album to playlist">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/><path d="M19 3v6M16 6h6"/>
+                            </svg>
+                        </button>
+                        <button type="button" class="library-action-btn" @onclick="() => PlayAlbumNow(album)" title="Play album now">
+                            <svg viewBox="0 0 24 24" fill="currentColor">
+                                <polygon points="5,3 19,12 5,21"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private string _searchQuery = "";
+    private List<string>? _albums;
+    private CancellationTokenSource? _debounceCts;
+    private IJSObjectReference? _persistenceModule;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _albums = await MusicService.GetAlbumsAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+            _persistenceModule = await JS.InvokeAsync<IJSObjectReference>("import", "./js/persistence.js");
+    }
+
+    private async Task OnSearchChanged()
+    {
+        _debounceCts?.Cancel();
+        _debounceCts = new CancellationTokenSource();
+        var token = _debounceCts.Token;
+
+        try
+        {
+            await Task.Delay(300, token);
+            _albums = await MusicService.GetAlbumsAsync(_searchQuery);
+            StateHasChanged();
+        }
+        catch (TaskCanceledException) { }
+    }
+
+    private async Task ClearSearch()
+    {
+        _searchQuery = "";
+        _albums = await MusicService.GetAlbumsAsync();
+    }
+
+    private async Task SearchForAlbum(string album)
+    {
+        _persistenceModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/persistence.js");
+        await _persistenceModule.InvokeVoidAsync("setLastSearch", album);
+        Nav.NavigateTo("/");
+    }
+
+    private async Task AddAlbumToPlaylist(string album)
+    {
+        var tracks = await MusicService.GetTracksByAlbumAsync(album);
+        foreach (var track in tracks)
+            Playlist.Enqueue(track);
+    }
+
+    private async Task PlayAlbumNow(string album)
+    {
+        var tracks = await MusicService.GetTracksByAlbumAsync(album);
+        if (tracks.Count == 0) return;
+
+        Playlist.RestoreFromTracks(tracks, 0);
+        await PlayLogService.LogPlayAsync(tracks[0]);
+    }
+
+    public void Dispose()
+    {
+        _debounceCts?.Dispose();
+        _ = _persistenceModule?.DisposeAsync();
+    }
+}

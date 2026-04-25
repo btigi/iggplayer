@@ -12,12 +12,12 @@ public class MusicService
         _dbFactory = dbFactory;
     }
 
-    public async Task<List<Track>> SearchAsync(string query, int maxResults = 50)
+    public async Task<List<Track>> SearchAsync(string query)
     {
         await using var db = await _dbFactory.CreateDbContextAsync();
 
         if (string.IsNullOrWhiteSpace(query))
-            return await db.Tracks.OrderBy(t => t.Artist).ThenBy(t => t.Title).Take(maxResults).ToListAsync();
+            return await db.Tracks.OrderBy(t => t.Artist).ThenBy(t => t.Title).ToListAsync();
 
         var pattern = $"%{query}%";
         return await db.Tracks
@@ -26,7 +26,6 @@ public class MusicService
                      || EF.Functions.Like(t.FileName, pattern)
                      || EF.Functions.Like(t.Album!, pattern))
             .OrderBy(t => t.Artist).ThenBy(t => t.Title)
-            .Take(maxResults)
             .ToListAsync();
     }
 
@@ -51,7 +50,45 @@ public class MusicService
         return await db.Tracks.CountAsync();
     }
 
-    public async Task<List<Track>> GetTracksByArtistAsync(string artist, int maxResults = 500)
+    public async Task<List<string>> GetAlbumsAsync(string query = "")
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+        var albums = db.Tracks
+            .Where(t => t.Album != null && t.Album != "")
+            .Select(t => t.Album!);
+
+        if (!string.IsNullOrWhiteSpace(query))
+        {
+            var pattern = $"%{query}%";
+            albums = albums.Where(album => EF.Functions.Like(album, pattern));
+        }
+
+        return await albums
+            .Distinct()
+            .OrderBy(album => album)
+            .ToListAsync();
+    }
+
+    public async Task<List<string>> GetArtistsAsync(string query = "")
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync();
+        var artists = db.Tracks
+            .Where(t => t.Artist != null && t.Artist != "")
+            .Select(t => t.Artist!);
+
+        if (!string.IsNullOrWhiteSpace(query))
+        {
+            var pattern = $"%{query}%";
+            artists = artists.Where(artist => EF.Functions.Like(artist, pattern));
+        }
+
+        return await artists
+            .Distinct()
+            .OrderBy(artist => artist)
+            .ToListAsync();
+    }
+
+    public async Task<List<Track>> GetTracksByArtistAsync(string artist)
     {
         if (string.IsNullOrWhiteSpace(artist))
             return [];
@@ -60,11 +97,10 @@ public class MusicService
         return await db.Tracks
             .Where(t => EF.Functions.Like(t.Artist!, pattern))
             .OrderBy(t => t.Album).ThenBy(t => t.TrackNumber).ThenBy(t => t.Title)
-            .Take(maxResults)
             .ToListAsync();
     }
 
-    public async Task<List<Track>> GetTracksByAlbumAsync(string album, int maxResults = 500)
+    public async Task<List<Track>> GetTracksByAlbumAsync(string album)
     {
         if (string.IsNullOrWhiteSpace(album))
             return [];
@@ -73,7 +109,6 @@ public class MusicService
         return await db.Tracks
             .Where(t => EF.Functions.Like(t.Album!, pattern))
             .OrderBy(t => t.TrackNumber).ThenBy(t => t.Title)
-            .Take(maxResults)
             .ToListAsync();
     }
 }

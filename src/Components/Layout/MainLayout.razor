@@ -19,6 +19,18 @@
             </svg>
             Search
         </a>
+        <a href="/albums" class="nav-link @(IsActive("/albums") ? "active" : "")">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                <rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 8h10M7 12h10M7 16h6"/>
+            </svg>
+            Albums
+        </a>
+        <a href="/artists" class="nav-link @(IsActive("/artists") ? "active" : "")">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                <circle cx="12" cy="8" r="4"/><path d="M4 20c1.5-4 14.5-4 16 0"/>
+            </svg>
+            Artists
+        </a>
         <a href="/playlist" class="nav-link @(IsActive("/playlist") ? "active" : "")">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
                 <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>
