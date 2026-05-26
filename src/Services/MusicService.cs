@@ -6,10 +6,16 @@ namespace IggPlayer.Services;
 public class MusicService
 {
     private readonly IDbContextFactory<MusicDbContext> _dbFactory;
+    private readonly HashSet<string> _hideArtistsOnAlbums;
 
-    public MusicService(IDbContextFactory<MusicDbContext> dbFactory)
+    public MusicService(IDbContextFactory<MusicDbContext> dbFactory, IConfiguration configuration)
     {
         _dbFactory = dbFactory;
+        _hideArtistsOnAlbums = configuration.GetSection("HideArtistsOnAlbums")
+            .Get<List<string>>()?
+            .Where(a => !string.IsNullOrWhiteSpace(a))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase)
+            ?? [];
     }
 
     public async Task<List<Track>> SearchAsync(string query)
@@ -82,10 +88,23 @@ public class MusicService
             artists = artists.Where(artist => EF.Functions.Like(artist, pattern));
         }
 
-        return await artists
+        var result = await artists
             .Distinct()
             .OrderBy(artist => artist)
             .ToListAsync();
+
+        if (_hideArtistsOnAlbums.Count == 0)
+            return result;
+
+        var hiddenArtists = await db.Tracks
+            .Where(t => t.Artist != null && t.Artist != ""
+                     && t.Album != null && _hideArtistsOnAlbums.Contains(t.Album))
+            .Select(t => t.Artist!)
+            .Distinct()
+            .ToListAsync();
+
+        var hiddenSet = hiddenArtists.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return result.Where(a => !hiddenSet.Contains(a)).ToList();
     }
 
     public async Task<List<Track>> GetTracksByArtistAsync(string artist)
