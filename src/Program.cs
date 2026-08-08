@@ -78,6 +78,9 @@ app.MapGet("/api/stream/{id:int}", async (int id, HttpContext httpContext, IDbCo
     var fileInfo = new FileInfo(fullPath);
     var fileLength = fileInfo.Length;
     var lastModified = fileInfo.LastWriteTimeUtc;
+    var contentType = Path.GetExtension(fullPath).Equals(".flac", StringComparison.OrdinalIgnoreCase)
+        ? "audio/flac"
+        : "audio/mpeg";
 
     httpContext.Response.Headers[HeaderNames.AcceptRanges] = "bytes";
     httpContext.Response.Headers[HeaderNames.LastModified] = lastModified.ToString("R");
@@ -97,15 +100,15 @@ app.MapGet("/api/stream/{id:int}", async (int id, HttpContext httpContext, IDbCo
         httpContext.Response.StatusCode = 206;
         httpContext.Response.Headers[HeaderNames.ContentRange] = $"bytes {start}-{end}/{fileLength}";
         httpContext.Response.ContentLength = length;
-        httpContext.Response.ContentType = "audio/mpeg";
+        httpContext.Response.ContentType = contentType;
 
         var stream = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read, 64 * 1024, useAsync: true);
         stream.Seek(start, SeekOrigin.Begin);
-        return Results.Stream(stream, "audio/mpeg", enableRangeProcessing: false);
+        return Results.Stream(stream, contentType, enableRangeProcessing: false);
     }
 
     var fileStream = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read, 64 * 1024, useAsync: true);
-    return Results.Stream(fileStream, "audio/mpeg", enableRangeProcessing: true);
+    return Results.Stream(fileStream, contentType, enableRangeProcessing: true);
 });
 
 app.MapPost("/api/scan", async (LibraryScanService scanService) =>

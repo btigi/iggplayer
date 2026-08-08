@@ -5,6 +5,12 @@ namespace IggPlayer.Services;
 
 public class LibraryScanService
 {
+    private static readonly HashSet<string> SupportedExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".mp3",
+        ".flac"
+    };
+
     private readonly IDbContextFactory<MusicDbContext> _dbFactory;
     private readonly string _basePath;
     private readonly ILogger<LibraryScanService> _logger;
@@ -25,11 +31,13 @@ public class LibraryScanService
 
         var existingPaths = await db.Tracks.Select(t => t.RelativePath).ToHashSetAsync(ct);
 
-        var mp3Files = Directory.EnumerateFiles(_basePath, "*.mp3", SearchOption.AllDirectories);
+        var audioFiles = Directory
+            .EnumerateFiles(_basePath, "*", SearchOption.AllDirectories)
+            .Where(path => SupportedExtensions.Contains(Path.GetExtension(path)));
 
         int added = 0, skipped = 0, failed = 0;
 
-        foreach (var fullPath in mp3Files)
+        foreach (var fullPath in audioFiles)
         {
             ct.ThrowIfCancellationRequested();
 

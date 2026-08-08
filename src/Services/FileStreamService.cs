@@ -24,7 +24,7 @@ public class FileStreamService
     {
         var fullPath = ResolvePath(relativePath);
         if (!File.Exists(fullPath))
-            throw new FileNotFoundException("MP3 file not found.", fullPath);
+            throw new FileNotFoundException("Audio file not found.", fullPath);
 
         return new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read, 64 * 1024, useAsync: true);
     }
