@@ -12,6 +12,10 @@
     <header class="app-header">
         <h1 class="page-heading">Albums</h1>
         <div class="header-actions">
+            @if (!string.IsNullOrEmpty(ArtistFilter))
+            {
+                <span class="track-count">@ArtistFilter</span>
+            }
             @if (_albums is not null)
             {
                 <span class="track-count">@_albums.Count albums</span>
@@ -26,7 +30,7 @@
             </svg>
             <input type="text"
                    class="search-input"
-                   placeholder="Search albums..."
+                   placeholder="@(string.IsNullOrEmpty(ArtistFilter) ? "Search albums..." : $"Search albums by {ArtistFilter}...")"
                    @bind="_searchQuery"
                    @bind:event="oninput"
                    @bind:after="OnSearchChanged" />
@@ -44,7 +48,11 @@
     else if (_albums.Count == 0)
     {
         <div class="empty-state">
-            @if (string.IsNullOrEmpty(_searchQuery))
+            @if (!string.IsNullOrEmpty(ArtistFilter) && string.IsNullOrEmpty(_searchQuery))
+            {
+                <p>No albums found for "<strong>@ArtistFilter</strong>"</p>
+            }
+            else if (string.IsNullOrEmpty(_searchQuery))
             {
                 <p>No albums found.</p>
             }
@@ -89,16 +97,32 @@
     private List<string>? _albums;
     private CancellationTokenSource? _debounceCts;
     private IJSObjectReference? _persistenceModule;
+    private string? _loadedArtistFilter;
 
-    protected override async Task OnInitializedAsync()
+    [SupplyParameterFromQuery(Name = "artist")]
+    public string? ArtistFilter { get; set; }
+
+    protected override async Task OnParametersSetAsync()
     {
-        _albums = await MusicService.GetAlbumsAsync();
+        if (_albums is null || !string.Equals(_loadedArtistFilter, ArtistFilter, StringComparison.Ordinal))
+        {
+            _searchQuery = "";
+            await LoadAlbumsAsync();
+        }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
             _persistenceModule = await JS.InvokeAsync<IJSObjectReference>("import", "./js/persistence.js");
+    }
+
+    private async Task LoadAlbumsAsync()
+    {
+        _loadedArtistFilter = ArtistFilter;
+        _albums = string.IsNullOrWhiteSpace(ArtistFilter)
+            ? await MusicService.GetAlbumsAsync(_searchQuery)
+            : await MusicService.GetAlbumsByArtistAsync(ArtistFilter, _searchQuery);
     }
 
     private async Task OnSearchChanged()
@@ -110,7 +134,7 @@
         try
         {
             await Task.Delay(300, token);
-            _albums = await MusicService.GetAlbumsAsync(_searchQuery);
+            await LoadAlbumsAsync();
             StateHasChanged();
         }
         catch (TaskCanceledException) { }
@@ -119,7 +143,7 @@
     private async Task ClearSearch()
     {
         _searchQuery = "";
-        _albums = await MusicService.GetAlbumsAsync();
+        await LoadAlbumsAsync();
     }
 
     private async Task SearchForAlbum(string album)

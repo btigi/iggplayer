@@ -107,6 +107,28 @@ public class MusicService
         return result.Where(a => !hiddenSet.Contains(a)).ToList();
     }
 
+    public async Task<List<string>> GetAlbumsByArtistAsync(string artist, string query = "")
+    {
+        if (string.IsNullOrWhiteSpace(artist))
+            return [];
+
+        await using var db = await _dbFactory.CreateDbContextAsync();
+        var albums = db.Tracks
+            .Where(t => t.Artist == artist && t.Album != null && t.Album != "")
+            .Select(t => t.Album!);
+
+        if (!string.IsNullOrWhiteSpace(query))
+        {
+            var pattern = $"%{query}%";
+            albums = albums.Where(album => EF.Functions.Like(album, pattern));
+        }
+
+        return await albums
+            .Distinct()
+            .OrderBy(album => album)
+            .ToListAsync();
+    }
+
     public async Task<List<Track>> GetTracksByArtistAsync(string artist)
     {
         if (string.IsNullOrWhiteSpace(artist))

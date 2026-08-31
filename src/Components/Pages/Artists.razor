@@ -60,11 +60,17 @@
             @foreach (var artist in _artists)
             {
                 <div class="library-list-item">
-                    <span class="library-list-title">@artist</span>
+                    <span class="library-list-title"
+                          onmouseenter="this.scrollWidth > this.clientWidth ? this.title = this.textContent.trim() : this.removeAttribute('title')">@artist</span>
                     <div class="library-list-actions">
                         <button type="button" class="library-action-btn" @onclick="() => SearchForArtist(artist)" title="Search for this artist">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                            </svg>
+                        </button>
+                        <button type="button" class="library-action-btn" @onclick="() => ShowAlbumsForArtist(artist)" title="Show albums for this artist">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/>
                             </svg>
                         </button>
                         <button type="button" class="library-action-btn" @onclick="() => AddArtistToPlaylist(artist)" title="Add artist to playlist">
@@ -127,6 +133,11 @@
         _persistenceModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/persistence.js");
         await _persistenceModule.InvokeVoidAsync("setLastSearch", artist);
         Nav.NavigateTo("/");
+    }
+
+    private void ShowAlbumsForArtist(string artist)
+    {
+        Nav.NavigateTo($"/albums?artist={Uri.EscapeDataString(artist)}");
     }
 
     private async Task AddArtistToPlaylist(string artist)

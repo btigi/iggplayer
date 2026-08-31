@@ -48,7 +48,14 @@
 		</div>
 	</div>
 
-	@if (_scanResult is not null)
+	@if (_scanError is not null)
+	{
+		<div class="scan-result">
+			Scan failed: @_scanError
+			<button class="dismiss-btn" @onclick="() => _scanError = null">&times;</button>
+		</div>
+	}
+	else if (_scanResult is not null)
 	{
 		<div class="scan-result">
 			Scan complete: @_scanResult.Value.added added, @_scanResult.Value.skipped unchanged, @_scanResult.Value.failed failed.
@@ -128,6 +135,7 @@
 	private List<Track>? _tracks;
 	private bool _scanning;
 	private (int added, int skipped, int failed)? _scanResult;
+	private string? _scanError;
 	private int _trackCount;
 	private CancellationTokenSource? _debounceCts;
 	private IJSObjectReference? _persistenceModule;
@@ -221,6 +229,8 @@
 	private async Task ScanLibrary()
 	{
 		_scanning = true;
+		_scanError = null;
+		_scanResult = null;
 		StateHasChanged();
 
 		try
@@ -229,9 +239,9 @@
 			_tracks = await MusicService.SearchAsync(_searchQuery);
 			_trackCount = await MusicService.GetTrackCountAsync();
 		}
-		catch (Exception)
+		catch (Exception ex)
 		{
-			_scanResult = (0, 0, -1);
+			_scanError = ex.Message;
 		}
 		finally
 		{
