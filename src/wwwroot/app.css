@@ -512,13 +512,28 @@ html, body {
     border-color: var(--accent);
 }
 
-.library-list-title {
-    display: block;
+.library-list-text {
     flex: 1;
     min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.library-list-title {
+    display: block;
     color: var(--text-primary);
     font-size: 0.92rem;
     font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.library-list-subtitle {
+    display: block;
+    color: var(--text-secondary);
+    font-size: 0.78rem;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

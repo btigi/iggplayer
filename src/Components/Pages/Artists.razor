@@ -60,8 +60,10 @@
             @foreach (var artist in _artists)
             {
                 <div class="library-list-item">
-                    <span class="library-list-title"
-                          onmouseenter="this.scrollWidth > this.clientWidth ? this.title = this.textContent.trim() : this.removeAttribute('title')">@artist</span>
+                    <div class="library-list-text">
+                        <span class="library-list-title"
+                              onmouseenter="this.scrollWidth > this.clientWidth ? this.title = this.textContent.trim() : this.removeAttribute('title')">@artist</span>
+                    </div>
                     <div class="library-list-actions">
                         <button type="button" class="library-action-btn" @onclick="() => SearchForArtist(artist)" title="Search for this artist">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

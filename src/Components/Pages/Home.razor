@@ -71,10 +71,14 @@
 		else if (_tracks.Count == 0)
 		{
 			<div class="empty-state">
-				@if (string.IsNullOrEmpty(_searchQuery))
+				@if (string.IsNullOrEmpty(_searchQuery) && string.IsNullOrEmpty(_albumFolder))
 				{
 					<p>No tracks in the library yet.</p>
 					<p>Click <strong>Scan Library</strong> to index your MP3 and FLAC files.</p>
+				}
+				else if (!string.IsNullOrEmpty(_albumFolder))
+				{
+					<p>No tracks found on this album.</p>
 				}
 				else
 				{
@@ -112,8 +116,8 @@
 								@if (!string.IsNullOrEmpty(track.Album))
 								{
 									<span class="separator">·</span>
-									<button type="button" class="meta-link" @onclick="() => SetSearchAndRun(track.Album!)" title="Search for this album">@track.Album</button>
-									<button type="button" class="meta-add" @onclick="() => AddAlbumToPlaylist(track.Album!)" title="Add entire album to playlist">+</button>
+									<button type="button" class="meta-link" @onclick="() => ShowAlbum(track)" title="Show tracks on this album">@track.Album</button>
+									<button type="button" class="meta-add" @onclick="() => AddAlbumToPlaylist(track)" title="Add entire album to playlist">+</button>
 								}
 							</span>
 						</div>
@@ -132,6 +136,7 @@
 
 @code {
 	private string _searchQuery = "";
+	private string? _albumFolder;
 	private List<Track>? _tracks;
 	private bool _scanning;
 	private (int added, int skipped, int failed)? _scanResult;
@@ -152,8 +157,15 @@
 			return;
 
 		_persistenceModule = await JS.InvokeAsync<IJSObjectReference>("import", "./js/persistence.js");
+		var albumFolder = await _persistenceModule.InvokeAsync<string>("getLastAlbumFolder");
 		var lastSearch = await _persistenceModule.InvokeAsync<string>("getLastSearch");
-		if (!string.IsNullOrWhiteSpace(lastSearch))
+		if (!string.IsNullOrWhiteSpace(albumFolder))
+		{
+			_albumFolder = albumFolder;
+			_searchQuery = lastSearch;
+			_tracks = await MusicService.GetTracksByAlbumAsync(albumFolder);
+		}
+		else if (!string.IsNullOrWhiteSpace(lastSearch))
 		{
 			_searchQuery = lastSearch;
 			_tracks = await MusicService.SearchAsync(lastSearch);
@@ -174,6 +186,7 @@
 		try
 		{
 			await Task.Delay(300, token);
+			_albumFolder = null;
 			_tracks = await MusicService.SearchAsync(_searchQuery);
 			await SaveLastSearchAsync();
 			StateHasChanged();
@@ -184,6 +197,7 @@
 	private async Task ClearSearch()
 	{
 		_searchQuery = "";
+		_albumFolder = null;
 		_tracks = await MusicService.SearchAsync("");
 		await SaveLastSearchAsync();
 	}
@@ -202,8 +216,20 @@
 	private async Task SetSearchAndRun(string query)
 	{
 		_searchQuery = query;
+		_albumFolder = null;
 		_tracks = await MusicService.SearchAsync(query);
 		await SaveLastSearchAsync();
+	}
+
+	private async Task ShowAlbum(Track track)
+	{
+		var folder = MusicService.GetAlbumFolder(track.RelativePath);
+		_searchQuery = track.Album ?? "";
+		_albumFolder = folder;
+		_tracks = await MusicService.GetTracksByAlbumAsync(folder);
+		if (_persistenceModule is null) return;
+		await _persistenceModule.InvokeVoidAsync("setLastSearch", _searchQuery);
+		await _persistenceModule.InvokeVoidAsync("setLastAlbumFolder", folder);
 	}
 
 	private async Task SaveLastSearchAsync()
@@ -219,9 +245,9 @@
 			Playlist.Enqueue(t);
 	}
 
-	private async Task AddAlbumToPlaylist(string album)
+	private async Task AddAlbumToPlaylist(Track track)
 	{
-		var tracks = await MusicService.GetTracksByAlbumAsync(album);
+		var tracks = await MusicService.GetTracksByAlbumAsync(MusicService.GetAlbumFolder(track.RelativePath));
 		foreach (var t in tracks)
 			Playlist.Enqueue(t);
 	}
@@ -236,7 +262,9 @@
 		try
 		{
 			_scanResult = await ScanService.ScanAsync();
-			_tracks = await MusicService.SearchAsync(_searchQuery);
+			_tracks = !string.IsNullOrEmpty(_albumFolder)
+				? await MusicService.GetTracksByAlbumAsync(_albumFolder)
+				: await MusicService.SearchAsync(_searchQuery);
 			_trackCount = await MusicService.GetTrackCountAsync();
 		}
 		catch (Exception ex)

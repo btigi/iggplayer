@@ -1,5 +1,6 @@
 const PLAYLIST_KEY = 'iggplayer-playlist';
 const SEARCH_KEY = 'iggplayer-last-search';
+const ALBUM_FOLDER_KEY = 'iggplayer-last-album-folder';
 
 export function getPlaylistState() {
 	try {
@@ -40,10 +41,29 @@ export function getLastSearch() {
 
 export function setLastSearch(query) {
 	try {
+		localStorage.removeItem(ALBUM_FOLDER_KEY);
 		if (query) {
 			localStorage.setItem(SEARCH_KEY, query);
 		} else {
 			localStorage.removeItem(SEARCH_KEY);
+		}
+	} catch (_) { }
+}
+
+export function getLastAlbumFolder() {
+	try {
+		return localStorage.getItem(ALBUM_FOLDER_KEY) || '';
+	} catch {
+		return '';
+	}
+}
+
+export function setLastAlbumFolder(folder) {
+	try {
+		if (folder) {
+			localStorage.setItem(ALBUM_FOLDER_KEY, folder);
+		} else {
+			localStorage.removeItem(ALBUM_FOLDER_KEY);
 		}
 	} catch (_) { }
 }

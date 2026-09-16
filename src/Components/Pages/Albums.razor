@@ -1,5 +1,6 @@
 @page "/albums"
 @implements IDisposable
+@using IggPlayer.Data
 @using IggPlayer.Services
 @inject MusicService MusicService
 @inject PlaylistService Playlist
@@ -68,10 +69,17 @@
             @foreach (var album in _albums)
             {
                 <div class="library-list-item">
-                    <span class="library-list-title"
-                          onmouseenter="this.scrollWidth > this.clientWidth ? this.title = this.textContent.trim() : this.removeAttribute('title')">@album</span>
+                    <div class="library-list-text">
+                        <span class="library-list-title"
+                              onmouseenter="this.scrollWidth > this.clientWidth ? this.title = this.textContent.trim() : this.removeAttribute('title')">@album.Name</span>
+                        @if (string.IsNullOrEmpty(ArtistFilter) && !string.IsNullOrEmpty(album.Artist))
+                        {
+                            <span class="library-list-subtitle"
+                                  onmouseenter="this.scrollWidth > this.clientWidth ? this.title = this.textContent.trim() : this.removeAttribute('title')">@album.Artist</span>
+                        }
+                    </div>
                     <div class="library-list-actions">
-                        <button type="button" class="library-action-btn" @onclick="() => SearchForAlbum(album)" title="Search for this album">
+                        <button type="button" class="library-action-btn" @onclick="() => SearchForAlbum(album)" title="Show tracks on this album">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
                             </svg>
@@ -95,7 +103,7 @@
 
 @code {
     private string _searchQuery = "";
-    private List<string>? _albums;
+    private List<AlbumInfo>? _albums;
     private CancellationTokenSource? _debounceCts;
     private IJSObjectReference? _persistenceModule;
     private string? _loadedArtistFilter;
@@ -147,23 +155,24 @@
         await LoadAlbumsAsync();
     }
 
-    private async Task SearchForAlbum(string album)
+    private async Task SearchForAlbum(AlbumInfo album)
     {
         _persistenceModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/persistence.js");
-        await _persistenceModule.InvokeVoidAsync("setLastSearch", album);
+        await _persistenceModule.InvokeVoidAsync("setLastSearch", album.Name);
+        await _persistenceModule.InvokeVoidAsync("setLastAlbumFolder", album.Folder);
         Nav.NavigateTo("/");
     }
 
-    private async Task AddAlbumToPlaylist(string album)
+    private async Task AddAlbumToPlaylist(AlbumInfo album)
     {
-        var tracks = await MusicService.GetTracksByAlbumAsync(album);
+        var tracks = await MusicService.GetTracksByAlbumAsync(album.Folder);
         foreach (var track in tracks)
             Playlist.Enqueue(track);
     }
 
-    private async Task PlayAlbumNow(string album)
+    private async Task PlayAlbumNow(AlbumInfo album)
     {
-        var tracks = await MusicService.GetTracksByAlbumAsync(album);
+        var tracks = await MusicService.GetTracksByAlbumAsync(album.Folder);
         if (tracks.Count == 0) return;
 
         Playlist.RestoreFromTracks(tracks, 0);

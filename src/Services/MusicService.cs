@@ -56,23 +56,22 @@ public class MusicService
         return await db.Tracks.CountAsync();
     }
 
-    public async Task<List<string>> GetAlbumsAsync(string query = "")
+    public async Task<List<AlbumInfo>> GetAlbumsAsync(string query = "")
     {
         await using var db = await _dbFactory.CreateDbContextAsync();
-        var albums = db.Tracks
-            .Where(t => t.Album != null && t.Album != "")
-            .Select(t => t.Album!);
+        var tracks = db.Tracks.Where(t => t.Album != null && t.Album != "");
 
         if (!string.IsNullOrWhiteSpace(query))
         {
             var pattern = $"%{query}%";
-            albums = albums.Where(album => EF.Functions.Like(album, pattern));
+            tracks = tracks.Where(t => EF.Functions.Like(t.Album!, pattern));
         }
 
-        return await albums
-            .Distinct()
-            .OrderBy(album => album)
+        var rows = await tracks
+            .Select(t => new { t.Album, t.Artist, t.RelativePath })
             .ToListAsync();
+
+        return GroupAlbums(rows.Select(t => (t.Album, t.Artist, t.RelativePath)));
     }
 
     public async Task<List<string>> GetArtistsAsync(string query = "")
@@ -107,26 +106,26 @@ public class MusicService
         return result.Where(a => !hiddenSet.Contains(a)).ToList();
     }
 
-    public async Task<List<string>> GetAlbumsByArtistAsync(string artist, string query = "")
+    public async Task<List<AlbumInfo>> GetAlbumsByArtistAsync(string artist, string query = "")
     {
         if (string.IsNullOrWhiteSpace(artist))
             return [];
 
         await using var db = await _dbFactory.CreateDbContextAsync();
-        var albums = db.Tracks
-            .Where(t => t.Artist == artist && t.Album != null && t.Album != "")
-            .Select(t => t.Album!);
+        var tracks = db.Tracks
+            .Where(t => t.Artist == artist && t.Album != null && t.Album != "");
 
         if (!string.IsNullOrWhiteSpace(query))
         {
             var pattern = $"%{query}%";
-            albums = albums.Where(album => EF.Functions.Like(album, pattern));
+            tracks = tracks.Where(t => EF.Functions.Like(t.Album!, pattern));
         }
 
-        return await albums
-            .Distinct()
-            .OrderBy(album => album)
+        var rows = await tracks
+            .Select(t => new { t.Album, t.Artist, t.RelativePath })
             .ToListAsync();
+
+        return GroupAlbums(rows.Select(t => (t.Album, t.Artist, t.RelativePath)));
     }
 
     public async Task<List<Track>> GetTracksByArtistAsync(string artist)
@@ -141,15 +140,59 @@ public class MusicService
             .ToListAsync();
     }
 
-    public async Task<List<Track>> GetTracksByAlbumAsync(string album)
+    public async Task<List<Track>> GetTracksByAlbumAsync(string folder)
     {
-        if (string.IsNullOrWhiteSpace(album))
-            return [];
+        folder = NormalizeFolder(folder);
         await using var db = await _dbFactory.CreateDbContextAsync();
-        var pattern = $"%{album}%";
-        return await db.Tracks
-            .Where(t => EF.Functions.Like(t.Album!, pattern))
+
+        IQueryable<Track> tracks;
+        if (folder.Length == 0)
+        {
+            tracks = db.Tracks.Where(t => t.RelativePath == t.FileName);
+        }
+        else
+        {
+            var posixFolder = folder.Replace('\\', '/');
+            tracks = db.Tracks.Where(t =>
+                t.RelativePath == folder + "\\" + t.FileName
+                || t.RelativePath == posixFolder + "/" + t.FileName);
+        }
+
+        return await tracks
             .OrderBy(t => t.TrackNumber).ThenBy(t => t.Title)
             .ToListAsync();
     }
+
+    public static string GetAlbumFolder(string relativePath)
+    {
+        if (string.IsNullOrEmpty(relativePath))
+            return "";
+
+        var normalized = relativePath.Replace('/', '\\').TrimEnd('\\');
+        var lastSlash = normalized.LastIndexOf('\\');
+        return lastSlash < 0 ? "" : normalized[..lastSlash];
+    }
+
+    private static string NormalizeFolder(string? folder)
+        => string.IsNullOrEmpty(folder) ? "" : folder.Replace('/', '\\').TrimEnd('\\');
+
+    private static List<AlbumInfo> GroupAlbums(IEnumerable<(string? Album, string? Artist, string RelativePath)> tracks)
+        => tracks
+            .GroupBy(t => GetAlbumFolder(t.RelativePath), StringComparer.OrdinalIgnoreCase)
+            .Select(g => new AlbumInfo(
+                MostCommon(g.Select(t => t.Album)) ?? g.Key,
+                MostCommon(g.Select(t => t.Artist)),
+                g.Key))
+            .OrderBy(album => album.Name, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(album => album.Artist, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+    private static string? MostCommon(IEnumerable<string?> values)
+        => values
+            .Where(v => !string.IsNullOrWhiteSpace(v))
+            .GroupBy(v => v!, StringComparer.OrdinalIgnoreCase)
+            .OrderByDescending(g => g.Count())
+            .ThenBy(g => g.Key, StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.First())
+            .FirstOrDefault();
 }
