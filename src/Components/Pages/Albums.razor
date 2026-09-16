@@ -68,7 +68,8 @@
             @foreach (var album in _albums)
             {
                 <div class="library-list-item">
-                    <span class="library-list-title">@album</span>
+                    <span class="library-list-title"
+                          onmouseenter="this.scrollWidth > this.clientWidth ? this.title = this.textContent.trim() : this.removeAttribute('title')">@album</span>
                     <div class="library-list-actions">
                         <button type="button" class="library-action-btn" @onclick="() => SearchForAlbum(album)" title="Search for this album">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
