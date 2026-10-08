@@ -43,6 +43,12 @@
         </a>
     </div>
     <div class="nav-right">
+        <a href="/stats" class="nav-link @(IsActive("/stats") ? "active" : "")">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                <path d="M4 19V5M4 19h16"/><path d="M8 16v-5M12 16V8M16 16v-3"/>
+            </svg>
+            Stats
+        </a>
         <button class="theme-toggle" @onclick="ToggleTheme" title="@(_theme == "dark" ? "Switch to light mode" : "Switch to dark mode")">
             @if (_theme == "dark")
             {

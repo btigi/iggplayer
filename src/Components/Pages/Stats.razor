@@ -1,0 +1,337 @@
+@page "/stats"
+@using System.Globalization
+@using IggPlayer.Data
+@using IggPlayer.Services
+@inject PlayLogService PlayLog
+@rendermode InteractiveServer
+
+<div class="app-container stats-page">
+    <header class="app-header">
+        <h1 class="page-heading">Stats</h1>
+        @if (_stats is { TotalPlays: > 0 })
+        {
+            <div class="header-actions">
+                <span class="track-count">@RangeLabel</span>
+            </div>
+        }
+    </header>
+
+    <form class="stats-range" @onsubmit="Generate">
+        <label class="stats-field">
+            <span>From</span>
+            <input type="date" @bind="_from" />
+        </label>
+        <label class="stats-field">
+            <span>To</span>
+            <input type="date" @bind="_to" />
+        </label>
+        <button type="submit" class="btn-scan" disabled="@_loading">
+            @if (_loading)
+            {
+                <span class="spinner"></span>
+            }
+            Generate
+        </button>
+    </form>
+
+    @if (_error is not null)
+    {
+        <div class="empty-state">
+            <p>@_error</p>
+        </div>
+    }
+    else if (_loading && _stats is null)
+    {
+        <div class="loading">Loading...</div>
+    }
+    else if (_stats is null || _stats.TotalPlays == 0)
+    {
+        <div class="empty-state">
+            <p>No plays between <strong>@RangeLabel</strong>.</p>
+        </div>
+    }
+    else
+    {
+        var stats = _stats!;
+        var slices = PieSlices(stats.TopGenres);
+        var decadeMax = stats.DecadeBreakdown.Count == 0 ? 1 : stats.DecadeBreakdown.Max(d => d.PlayCount);
+
+        <section class="stats-metrics" aria-label="Summary">
+            <div class="stats-metric">
+                <strong>@stats.TotalPlays</strong>
+                <span>@(stats.TotalPlays == 1 ? "play" : "plays")</span>
+            </div>
+            <div class="stats-metric">
+                <strong>@FormatListenTime(stats.TotalDurationMs)</strong>
+                <span>est. listening time</span>
+            </div>
+            <div class="stats-metric">
+                <strong>@stats.UniqueAlbums</strong>
+                <span>@(stats.UniqueAlbums == 1 ? "album" : "albums")</span>
+            </div>
+            <div class="stats-metric">
+                <strong>@stats.UniqueArtists</strong>
+                <span>@(stats.UniqueArtists == 1 ? "artist" : "artists")</span>
+            </div>
+        </section>
+
+        <section class="stats-highlights" aria-label="Highlights">
+            @Highlight("Top track", stats.TopTracks.FirstOrDefault())
+            @Highlight("Top album", stats.TopAlbums.FirstOrDefault())
+            @Highlight("Top artist", stats.TopArtists.FirstOrDefault())
+            @Highlight("Top genre", stats.TopGenres.FirstOrDefault())
+        </section>
+
+        <section class="stats-charts">
+            <article class="stats-panel">
+                <h2>Genres</h2>
+                @if (slices.Count == 0)
+                {
+                    <p class="stats-empty-note">No genre tags in this range.</p>
+                }
+                else
+                {
+                    <div class="stats-pie-row">
+                        <div class="stats-pie" style="background: @PieBackground(slices)" role="img" aria-label="Genre breakdown"></div>
+                        <ul class="stats-legend">
+                            @for (var i = 0; i < slices.Count; i++)
+                            {
+                                <li>
+                                    <span class="stats-swatch" style="background: @ChartColors[i % ChartColors.Length]"></span>
+                                    <span class="stats-legend-name">@slices[i].Name</span>
+                                    <span class="stats-legend-count">@slices[i].PlayCount</span>
+                                </li>
+                            }
+                        </ul>
+                    </div>
+                }
+            </article>
+
+            <article class="stats-panel">
+                <h2>Decades</h2>
+                @if (stats.DecadeBreakdown.Count == 0)
+                {
+                    <p class="stats-empty-note">No year tags in this range.</p>
+                }
+                else
+                {
+                    <div class="stats-bars" role="img" aria-label="Plays by decade">
+                        @foreach (var decade in stats.DecadeBreakdown)
+                        {
+                            var pct = Math.Max(2, (int)Math.Round(decade.PlayCount * 100d / decadeMax));
+                            <div class="stats-bar-row">
+                                <span class="stats-bar-label">@decade.Name</span>
+                                <div class="stats-bar-track">
+                                    <div class="stats-bar-fill" style="width: @(pct)%"></div>
+                                </div>
+                                <span class="stats-bar-count">@decade.PlayCount</span>
+                            </div>
+                        }
+                    </div>
+                }
+            </article>
+        </section>
+
+        <section class="stats-lists">
+            @RankList("Tracks", stats.TopTracks)
+            @RankList("Albums", stats.TopAlbums)
+            @RankList("Artists", stats.TopArtists)
+        </section>
+    }
+</div>
+
+@code {
+    private static readonly string[] ChartColors =
+    [
+        "#5b9cf6",
+        "#5dcaa5",
+        "#f0a05a",
+        "#e06c9f",
+        "#c084fc",
+        "#e8d44d",
+        "#6ec1e4",
+        "#f07178"
+    ];
+
+    private DateOnly _from = new(DateTime.Today.Year, 1, 1);
+    private DateOnly _to = DateOnly.FromDateTime(DateTime.Today);
+    private DateOnly _appliedFrom = new(DateTime.Today.Year, 1, 1);
+    private DateOnly _appliedTo = DateOnly.FromDateTime(DateTime.Today);
+    private ListeningStats? _stats;
+    private bool _loading = true;
+    private string? _error;
+
+    private string RangeLabel => $"{_appliedFrom:MMM d, yyyy} – {_appliedTo:MMM d, yyyy}";
+
+    protected override async Task OnInitializedAsync() => await Generate();
+
+    private async Task Generate()
+    {
+        _error = null;
+        if (_from > _to)
+        {
+            _error = "The start date must be on or before the end date.";
+            _stats = null;
+            _loading = false;
+            return;
+        }
+
+        _loading = true;
+        try
+        {
+            var start = _from.ToDateTime(TimeOnly.MinValue, DateTimeKind.Local).ToUniversalTime();
+            var end = _to.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Local).ToUniversalTime();
+            _stats = await PlayLog.GetListeningStatsAsync(start, end);
+            _appliedFrom = _from;
+            _appliedTo = _to;
+        }
+        catch (Exception)
+        {
+            _error = "Couldn't load stats for that range.";
+            _stats = null;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private static List<StatItem> PieSlices(List<StatItem> genres)
+    {
+        const int max = 8;
+        if (genres.Count <= max) return genres;
+        var head = genres.Take(max - 1).ToList();
+        head.Add(new StatItem
+        {
+            Name = "Other",
+            PlayCount = genres.Skip(max - 1).Sum(g => g.PlayCount)
+        });
+        return head;
+    }
+
+    private static string PieBackground(IReadOnlyList<StatItem> slices)
+    {
+        var total = slices.Sum(s => s.PlayCount);
+        if (total <= 0) return "var(--bg-tertiary)";
+
+        var parts = new List<string>(slices.Count);
+        double acc = 0;
+        for (var i = 0; i < slices.Count; i++)
+        {
+            var start = acc;
+            acc += slices[i].PlayCount * 100d / total;
+            var color = ChartColors[i % ChartColors.Length];
+            parts.Add($"{color} {Fmt(start)}% {Fmt(acc)}%");
+        }
+
+        return $"conic-gradient({string.Join(", ", parts)})";
+    }
+
+    private static string Fmt(double value) => value.ToString("0.##", CultureInfo.InvariantCulture);
+
+    private static string FormatListenTime(long ms)
+    {
+        if (ms <= 0) return "0m";
+        var t = TimeSpan.FromMilliseconds(ms);
+        if (t.TotalDays >= 1)
+            return $"{(int)t.TotalDays}d {t.Hours}h";
+        if (t.TotalHours >= 1)
+            return $"{(int)t.TotalHours}h {t.Minutes}m";
+        if (t.TotalMinutes >= 1)
+            return $"{(int)t.TotalMinutes}m";
+        return "<1m";
+    }
+
+    private static string PlayLabel(int count) => count == 1 ? "1 play" : $"{count} plays";
+
+    private RenderFragment Highlight(string label, StatItem? item) => builder =>
+    {
+        builder.OpenElement(0, "article");
+        builder.AddAttribute(1, "class", "stats-highlight");
+
+        builder.OpenElement(2, "span");
+        builder.AddAttribute(3, "class", "stats-kicker");
+        builder.AddContent(4, label);
+        builder.CloseElement();
+
+        builder.OpenElement(5, "h2");
+        builder.AddContent(6, item?.Name ?? "—");
+        builder.CloseElement();
+
+        if (!string.IsNullOrEmpty(item?.Subtitle))
+        {
+            builder.OpenElement(7, "p");
+            builder.AddContent(8, item.Subtitle);
+            builder.CloseElement();
+        }
+
+        builder.OpenElement(9, "span");
+        builder.AddAttribute(10, "class", "stats-count");
+        builder.AddContent(11, item is null ? "No data" : PlayLabel(item.PlayCount));
+        builder.CloseElement();
+
+        builder.CloseElement();
+    };
+
+    private RenderFragment RankList(string title, List<StatItem> items) => builder =>
+    {
+        builder.OpenElement(0, "article");
+        builder.AddAttribute(1, "class", "stats-panel");
+
+        builder.OpenElement(2, "h2");
+        builder.AddContent(3, title);
+        builder.CloseElement();
+
+        if (items.Count == 0)
+        {
+            builder.OpenElement(4, "p");
+            builder.AddAttribute(5, "class", "stats-empty-note");
+            builder.AddContent(6, "Nothing to rank.");
+            builder.CloseElement();
+        }
+        else
+        {
+            builder.OpenElement(7, "ol");
+            builder.AddAttribute(8, "class", "stats-rank");
+            for (var i = 0; i < items.Count; i++)
+            {
+                var item = items[i];
+                var seq = 20 + i * 20;
+                builder.OpenElement(seq, "li");
+
+                builder.OpenElement(seq + 1, "span");
+                builder.AddAttribute(seq + 2, "class", "stats-rank-num");
+                builder.AddContent(seq + 3, i + 1);
+                builder.CloseElement();
+
+                builder.OpenElement(seq + 4, "span");
+                builder.AddAttribute(seq + 5, "class", "stats-rank-text");
+
+                builder.OpenElement(seq + 6, "span");
+                builder.AddAttribute(seq + 7, "class", "stats-rank-name");
+                builder.AddContent(seq + 8, item.Name);
+                builder.CloseElement();
+
+                if (!string.IsNullOrEmpty(item.Subtitle))
+                {
+                    builder.OpenElement(seq + 9, "span");
+                    builder.AddAttribute(seq + 10, "class", "stats-rank-sub");
+                    builder.AddContent(seq + 11, item.Subtitle);
+                    builder.CloseElement();
+                }
+
+                builder.CloseElement();
+
+                builder.OpenElement(seq + 12, "span");
+                builder.AddAttribute(seq + 13, "class", "stats-rank-count");
+                builder.AddContent(seq + 14, item.PlayCount);
+                builder.CloseElement();
+
+                builder.CloseElement();
+            }
+            builder.CloseElement();
+        }
+
+        builder.CloseElement();
+    };
+}
