@@ -184,7 +184,7 @@ html, body {
 
 /* === App Container === */
 .app-container {
-    max-width: 900px;
+    max-width: 1400px;
     margin: 0 auto;
     padding: 24px 20px 120px;
 }
@@ -494,7 +494,7 @@ html, body {
 /* === Library List Pages === */
 .library-list {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
     gap: 8px;
 }
 
@@ -656,7 +656,7 @@ html, body {
 
 /* === Stats === */
 .stats-page {
-    max-width: 980px;
+    max-width: 1400px;
 }
 
 .stats-range {
