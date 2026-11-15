@@ -20,3 +20,11 @@ public class ListeningStats
     public List<StatItem> TopGenres { get; init; } = [];
     public List<StatItem> DecadeBreakdown { get; init; } = [];
 }
+
+public class TrackPlayCounts
+{
+    public int Total { get; init; }
+    public int Today { get; init; }
+    public int Month { get; init; }
+    public int Year { get; init; }
+}

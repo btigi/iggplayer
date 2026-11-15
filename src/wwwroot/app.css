@@ -1012,6 +1012,23 @@ html[data-theme="light"] .stats-field input[type="date"] {
     filter: invert(1);
 }
 
+.player-play-counts {
+    margin-left: auto;
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    flex-shrink: 0;
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.player-play-count strong {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+}
+
 /* === Blazor Error UI === */
 #blazor-error-ui {
     background: #b32121;
@@ -1069,6 +1086,14 @@ html[data-theme="light"] .stats-field input[type="date"] {
     .player-audio {
         width: 100%;
         max-width: none;
+    }
+
+    .player-play-counts {
+        margin-left: 0;
+        width: 100%;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+        gap: 8px;
     }
 }
 

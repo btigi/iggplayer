@@ -88,6 +88,15 @@
         <button class="player-btn" @onclick="NextTrack" disabled="@(Playlist.CurrentIndex >= Playlist.Queue.Count - 1)" title="Next">
             <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
         </button>
+        @if (_playCounts is not null)
+        {
+            <div class="player-play-counts" title="Play counts for this track">
+                <span class="player-play-count"><strong>@_playCounts.Total</strong> total</span>
+                <span class="player-play-count"><strong>@_playCounts.Today</strong> today</span>
+                <span class="player-play-count"><strong>@_playCounts.Month</strong> month</span>
+                <span class="player-play-count"><strong>@_playCounts.Year</strong> year</span>
+            </div>
+        }
     </div>
 }
 
@@ -103,6 +112,8 @@
     private IJSObjectReference? _persistenceModule;
     private DotNetObjectReference<MainLayout>? _dotNetRef;
     private int? _lastPlayedTrackId;
+    private int? _countsTrackId;
+    private TrackPlayCounts? _playCounts;
     private string _theme = "dark";
 
     private string _pageTitle => Playlist.CurrentTrack is not null
@@ -150,6 +161,23 @@
                 await _audioModule.InvokeVoidAsync("play", $"/api/stream/{Playlist.CurrentTrack.Id}");
             }
         }
+
+        if (Playlist.CurrentTrack is not null && _countsTrackId != Playlist.CurrentTrack.Id)
+            await RefreshPlayCountsAsync(Playlist.CurrentTrack);
+        else if (Playlist.CurrentTrack is null && _playCounts is not null)
+        {
+            _countsTrackId = null;
+            _playCounts = null;
+        }
+    }
+
+    private async Task RefreshPlayCountsAsync(Track track)
+    {
+        _countsTrackId = track.Id;
+        var counts = await PlayLog.GetTrackPlayCountsAsync(track);
+        if (Playlist.CurrentTrack?.Id != track.Id) return;
+        _playCounts = counts;
+        StateHasChanged();
     }
 
     [JSInvokable]

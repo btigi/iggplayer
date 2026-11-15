@@ -50,6 +50,48 @@ public class PlayLogService
             .ToListAsync();
     }
 
+    public async Task<TrackPlayCounts> GetTrackPlayCountsAsync(Track track)
+    {
+        var trackKey = TrackKey(new PlayRow(track.Title, track.Artist, track.Album, track.Genre, track.Year, track.FileName, null));
+        if (trackKey is null)
+            return new TrackPlayCounts();
+
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        var todayStart = ToUtcIso(today);
+        var monthStart = ToUtcIso(new DateOnly(today.Year, today.Month, 1));
+        var yearStart = ToUtcIso(new DateOnly(today.Year, 1, 1));
+
+        var title = Clean(track.Title);
+        var fileName = Clean(track.FileName);
+
+        await using var db = await _dbFactory.CreateDbContextAsync();
+        var candidates = await db.PlayHistory
+            .Where(e =>
+                (title != null && (e.Title == title || e.FileName == title)) ||
+                (fileName != null && (e.FileName == fileName || e.Title == fileName)))
+            .Select(e => new { e.Title, e.Artist, e.FileName, e.PlayedAt })
+            .ToListAsync();
+
+        var playedAts = candidates
+            .Where(e => string.Equals(
+                TrackKey(new PlayRow(e.Title, e.Artist, null, null, null, e.FileName, null)),
+                trackKey,
+                StringComparison.OrdinalIgnoreCase))
+            .Select(e => e.PlayedAt)
+            .ToList();
+
+        return new TrackPlayCounts
+        {
+            Total = playedAts.Count,
+            Today = playedAts.Count(p => string.Compare(p, todayStart, StringComparison.Ordinal) >= 0),
+            Month = playedAts.Count(p => string.Compare(p, monthStart, StringComparison.Ordinal) >= 0),
+            Year = playedAts.Count(p => string.Compare(p, yearStart, StringComparison.Ordinal) >= 0)
+        };
+    }
+
+    private static string ToUtcIso(DateOnly localDate) =>
+        localDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Local).ToUniversalTime().ToString("o");
+
     public async Task<ListeningStats> GetListeningStatsAsync(DateTime startUtc, DateTime endExclusiveUtc, int topN = 10)
     {
         var start = startUtc.ToUniversalTime().ToString("o");
